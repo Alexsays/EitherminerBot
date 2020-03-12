@@ -38,11 +38,12 @@ type DashboardStatistic struct {
 	ValidShares      uint32
 	InvalidShares    uint32
 	StaleShares      uint32
+	ActiveWorkers    uint16
 }
 
 type DashboardData struct {
-	CurrentStatistics []DashboardCurrentStatistic
-	Settings          []DashboardSettings
+	CurrentStatistics DashboardCurrentStatistic
+	Settings          DashboardSettings
 	Statistics        []DashboardStatistic
 	Workers           []DashboardWorker
 }

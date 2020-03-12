@@ -45,10 +45,10 @@ func main() {
         msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 
         switch update.Message.Text {
-		case "/open":
+		case "/dashboard":
 			dashboard := ethermine.GetDashboard()
 			dashboardStr := "Workers\n"
-			dashboardStr = dashboardStr + dashboard.Status
+			dashboardStr += dashboard.Status
             msg.Text = dashboardStr
         case "close":
             msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
