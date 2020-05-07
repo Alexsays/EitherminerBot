@@ -3,14 +3,13 @@ package ethermine
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 	"time"
 )
 
 const BaseURL = "https://api.ethermine.org/"
 const MinerPATH = "miner/"
 
-var Wallet = os.Getenv("WALLET_TOKEN")
+var Wallet = ""
 var myClient = &http.Client{Timeout: 10 * time.Second}
 
 func GetJson(url string, target interface{}) error {

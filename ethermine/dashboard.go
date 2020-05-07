@@ -51,6 +51,7 @@ type DashboardData struct {
 type DashboardResponse struct {
 	Status string
 	Data   DashboardData
+	Error  string
 }
 
 func GetDashboard() DashboardResponse {
