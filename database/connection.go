@@ -11,7 +11,7 @@ import (
 // ConnectToDB allows user to connect to Postgres DB
 func ConnectToDB(dbUser string, dbPassword string, dbName string) (*gorm.DB, error) {
 	var connectionString = fmt.Sprintf(
-		"host=localhost port=5445 sslmode=disable user=%s password=%s dbname=%s",
+		"host=postgres port=5432 sslmode=disable user=%s password=%s dbname=%s",
 		dbUser, dbPassword, dbName,
 	)
 

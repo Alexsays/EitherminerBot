@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"../models"
+	"github.com/Alexsays/EithermineBot/models"
 	"github.com/jinzhu/gorm"
 )
 

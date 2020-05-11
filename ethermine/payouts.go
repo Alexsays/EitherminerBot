@@ -5,7 +5,7 @@ type PayoutData struct {
 	Start  float32
 	End    float32
 	Amount float64
-	txHash string
+	TxHash string
 }
 
 type PayoutsResponse struct {

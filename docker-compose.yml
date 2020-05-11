@@ -1,5 +1,7 @@
 version: "3.3"
 services:
+  bot:
+    build: ./
   postgres:
     image: postgres:12
     ports:

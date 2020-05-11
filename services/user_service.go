@@ -3,9 +3,9 @@ package services
 import (
 	"log"
 
-	"../dtos"
-	"../models"
-	"../repositories"
+	"github.com/Alexsays/EithermineBot/dtos"
+	"github.com/Alexsays/EithermineBot/models"
+	"github.com/Alexsays/EithermineBot/repositories"
 	"github.com/google/uuid"
 )
 

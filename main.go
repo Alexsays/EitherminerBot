@@ -1,34 +1,49 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
-	"./database"
-	"./ethermine"
-	"./models"
-	"./repositories"
-	"./services"
+	"github.com/Alexsays/EithermineBot/database"
+	"github.com/Alexsays/EithermineBot/ethermine"
+	"github.com/Alexsays/EithermineBot/models"
+	"github.com/Alexsays/EithermineBot/repositories"
+	"github.com/Alexsays/EithermineBot/services"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/jinzhu/gorm"
+	"github.com/joho/godotenv"
 )
 
 var minerKeyboard = tgbotapi.NewInlineKeyboardMarkup(
 	tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData("📊 Dashboard", "/dashboard"),
-		tgbotapi.NewInlineKeyboardButtonData("📈 Current Stats", "/currentStats"),
-	),
-	tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("🗒 History", "/history"),
 		tgbotapi.NewInlineKeyboardButtonData("💵 Payouts", "/payouts"),
 	),
 	tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("🔄 Rounds", "/rounds"),
-		tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "/settings"),
+		tgbotapi.NewInlineKeyboardButtonData("🛑 Change Token", "/changeToken"),
+		tgbotapi.NewInlineKeyboardButtonData("📈 Current Stats", "/currentStats"),
+		// tgbotapi.NewInlineKeyboardButtonData("🗒 History", "/history"),
 	),
+	// tgbotapi.NewInlineKeyboardRow(
+	// 	tgbotapi.NewInlineKeyboardButtonData("🔄 Rounds", "/rounds"),
+	// 	tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "/settings"),
+	// ),
 )
+
+var waitingForToken = false
+
+func createRefreshKeyboard(action string) tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔄 Refresh", action),
+		),
+	)
+}
 
 func createUser(db *gorm.DB, telegramUser *tgbotapi.User, token string) {
 	userRepository := repositories.NewUserRepository(db)
@@ -61,23 +76,92 @@ func getUser(db *gorm.DB, telegramUser *tgbotapi.User) *models.User {
 	return resp.Data.(*models.User)
 }
 
-func minerCallbacks(db *gorm.DB, data string, telegramUser *tgbotapi.User) string {
+func createMessageForCommand(command string, db *gorm.DB, telegramUser *tgbotapi.User) string {
 	msg := ""
 
-	switch data {
+	switch command {
 	case "/dashboard":
 		ethermine.Wallet = getUser(db, telegramUser).EtherminerToken
 		dashboard := ethermine.GetDashboard()
-		dashboardStr := "🛠 Workers\n"
-		dashboardStr += "- " + dashboard.Data.Workers[0].Worker
+		dashboardStr := "📊 Dashboard\n\n"
+		dashboardStr += "💰 Credits\n"
+		unpaid := dashboard.Data.CurrentStatistics.Unpaid / math.Pow(1000, 6)
+		dashboardStr += "- Unpaid: " + fmt.Sprintf("%.5f", unpaid) + " ETH\n"
+		validShares := dashboard.Data.CurrentStatistics.ValidShares
+		invalidShares := dashboard.Data.CurrentStatistics.InvalidShares
+		staleShares := dashboard.Data.CurrentStatistics.StaleShares
+		dashboardStr += fmt.Sprint("- Valid, Stale, Invalid Shares: ", validShares, " / ", staleShares, " / ", invalidShares, "\n")
+		currentHashrate := fmt.Sprintf("%.1f", dashboard.Data.CurrentStatistics.CurrentHashrate/math.Pow(1000, 2))
+		averageHashrate := fmt.Sprintf("%.1f", dashboard.Data.CurrentStatistics.AverageHashrate/math.Pow(1000, 2))
+		reportedHashrate := fmt.Sprintf("%.1f", dashboard.Data.CurrentStatistics.ReportedHashrate/math.Pow(1000, 2))
+		dashboardStr += fmt.Sprint("- Current, Average, Reported Hashrate: \n", currentHashrate, "MH/s / ", averageHashrate, "MH/s / ", reportedHashrate, "MH/s\n")
+		dashboardStr += "\n🛠 Workers\n"
+		dashboardStr += fmt.Sprint("- Active workers: ", dashboard.Data.CurrentStatistics.ActiveWorkers, " / ", len(dashboard.Data.Workers), "\n")
+		for i := 0; i < len(dashboard.Data.Workers); i++ {
+			dashboardStr += "* " + dashboard.Data.Workers[i].Worker + "\n"
+			lastSeen := dashboard.Data.Workers[i].LastSeen
+			lastSeenTime := time.Unix(int64(lastSeen), 0).Format("02-01-2006 15:04")
+			dashboardStr += "* * Last seen: " + lastSeenTime + "\n"
+		}
 		msg = dashboardStr
+	case "/payouts":
+		ethermine.Wallet = getUser(db, telegramUser).EtherminerToken
+		payouts := ethermine.GetPayouts()
+		payoutsStr := "💵 Payouts\n\n"
+		totalPayouts := 0.0
+		for i := 0; i < len(payouts.Data); i++ {
+			totalPayouts += payouts.Data[0].Amount
+		}
+		payoutsStr += "Total payouts: " + fmt.Sprintf("%.5f", totalPayouts/math.Pow(1000, 6)) + " ETH \n\n"
+		for i := 0; i < len(payouts.Data); i++ {
+			paidOn := payouts.Data[0].PaidOn
+			paidOnTime := time.Unix(int64(paidOn), 0).Format("02-01-2006 15:04")
+			payoutsStr += "- Paid on: " + paidOnTime + "\n"
+			amount := payouts.Data[0].Amount / math.Pow(1000, 6)
+			payoutsStr += "- - Amount: " + fmt.Sprintf("%.5f", amount) + " ETH\n"
+			payoutsStr += "- - From / To Block: " + fmt.Sprintf("%.0f", payouts.Data[0].Start) + " / " + fmt.Sprintf("%.0f", payouts.Data[0].End) + "\n"
+			payoutsStr += "- - Tx Hash: " + payouts.Data[0].TxHash + "\n\n"
+		}
+		msg = payoutsStr
+	case "/currentStats":
+		ethermine.Wallet = getUser(db, telegramUser).EtherminerToken
+		currentStats := ethermine.GetCurrentStats()
+		currentStatsStr := "📈 Current Statistics\n\n"
+		dataTime := currentStats.Data.Time
+		currentTime := time.Unix(int64(dataTime), 0).Format("02-01-2006 15:04")
+		currentHashrate := fmt.Sprintf("%.1f", currentStats.Data.CurrentHashrate/math.Pow(1000, 2))
+		averageHashrate := fmt.Sprintf("%.1f", currentStats.Data.AverageHashrate/math.Pow(1000, 2))
+		reportedHashrate := fmt.Sprintf("%.1f", currentStats.Data.ReportedHashrate/math.Pow(1000, 2))
+		currentStatsStr += fmt.Sprint("- Current, Average, Reported Hashrate: \n", currentHashrate, "MH/s / ", averageHashrate, "MH/s / ", reportedHashrate, "MH/s\n")
+		validShares := currentStats.Data.ValidShares
+		invalidShares := currentStats.Data.InvalidShares
+		staleShares := currentStats.Data.StaleShares
+		currentStatsStr += fmt.Sprint("- Valid, Stale, Invalid Shares: ", validShares, " / ", staleShares, " / ", invalidShares, "\n")
+		unpaid := currentStats.Data.Unpaid / math.Pow(1000, 6)
+		currentStatsStr += "- Unpaid: " + fmt.Sprintf("%.5f", unpaid) + " ETH\n"
+		unconfirmed := currentStats.Data.Unconfirmed / math.Pow(1000, 6)
+		currentStatsStr += "- Unconfirmed: " + fmt.Sprintf("%.5f", unconfirmed) + " ETH\n"
+		coinsPerMin := currentStats.Data.CoinsPerMin
+		currentStatsStr += "- Coins per minute: " + fmt.Sprintf("%.8f", coinsPerMin) + " ETH\n"
+		usdPerMin := currentStats.Data.UsdPerMin
+		currentStatsStr += "- USD per minute: " + fmt.Sprintf("%.8f", usdPerMin) + " $\n"
+		btcPerMin := currentStats.Data.BtcPerMin
+		currentStatsStr += "- Bitcoin per minute: " + fmt.Sprintf("%.8f", btcPerMin) + " ₿\n"
+		currentStatsStr += "- Current Time: " + currentTime + "\n"
+		msg = currentStatsStr
+	case "/changeToken":
+		waitingForToken = true
+		changeTokenStr := "🛑 Write now your Ethermine token or something else to skip this"
+		msg = changeTokenStr
+	default:
+		msg = "🏗 Not available"
 	}
 
 	return msg
 }
 
 func databaseConnection() *gorm.DB {
-	db, err := database.ConnectToDB("postgres", "pass", "eithermine_bot")
+	db, err := database.ConnectToDB("postgres", os.Getenv("POSTGRES_PASSWORD"), "eithermine_bot")
 	if err != nil {
 		panic(err)
 	}
@@ -99,7 +183,9 @@ func sendMessage(msg tgbotapi.MessageConfig, bot *tgbotapi.BotAPI) {
 }
 
 func main() {
+	err := godotenv.Load(".env")
 	token := os.Getenv("TELEGRAM_TOKEN")
+
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		panic(err) // You should add better error handling than this!
@@ -115,8 +201,6 @@ func main() {
 	u.Timeout = 60
 
 	updates, _ := bot.GetUpdatesChan(u)
-
-	waitingForToken := false
 
 	for update := range updates {
 		if update.Message == nil && update.CallbackQuery == nil {
@@ -154,7 +238,7 @@ func main() {
 					if !userExist(db, update.Message.From) {
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 						msg.Text = "💻 Welcome to Eitherminer. To start getting info about your Ethermine account, " +
-							"write provide me your Ethermine token (sample: 716B383fA19526Lh73sd44353B3655e0339b513d)"
+							"provide me your Ethermine token (sample: 716B383fA19526Lh73sd44353B3655e0339b513d)"
 						waitingForToken = true
 
 						sendMessage(msg, bot)
@@ -174,7 +258,13 @@ func main() {
 		} else if callback := update.CallbackQuery; callback != nil {
 			msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "")
 
-			msg.Text = minerCallbacks(db, callback.Data, update.CallbackQuery.From)
+			bot.DeleteMessage(tgbotapi.DeleteMessageConfig{
+				ChatID:    update.CallbackQuery.Message.Chat.ID,
+				MessageID: update.CallbackQuery.Message.MessageID,
+			})
+
+			msg.Text = createMessageForCommand(callback.Data, db, update.CallbackQuery.From)
+			msg.ReplyMarkup = createRefreshKeyboard(callback.Data)
 
 			sendMessage(msg, bot)
 		}
