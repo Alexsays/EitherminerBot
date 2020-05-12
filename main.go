@@ -114,13 +114,13 @@ func createMessageForCommand(command string, db *gorm.DB, telegramUser *tgbotapi
 		}
 		payoutsStr += "Total payouts: " + fmt.Sprintf("%.5f", totalPayouts/math.Pow(1000, 6)) + " ETH \n\n"
 		for i := 0; i < len(payouts.Data); i++ {
-			paidOn := payouts.Data[0].PaidOn
+			paidOn := payouts.Data[i].PaidOn
 			paidOnTime := time.Unix(int64(paidOn), 0).Format("02-01-2006 15:04")
 			payoutsStr += "- Paid on: " + paidOnTime + "\n"
-			amount := payouts.Data[0].Amount / math.Pow(1000, 6)
+			amount := payouts.Data[i].Amount / math.Pow(1000, 6)
 			payoutsStr += "- - Amount: " + fmt.Sprintf("%.5f", amount) + " ETH\n"
-			payoutsStr += "- - From / To Block: " + fmt.Sprintf("%.0f", payouts.Data[0].Start) + " / " + fmt.Sprintf("%.0f", payouts.Data[0].End) + "\n"
-			payoutsStr += "- - Tx Hash: " + payouts.Data[0].TxHash + "\n\n"
+			payoutsStr += "- - From / To Block: " + fmt.Sprintf("%.0f", payouts.Data[i].Start) + " / " + fmt.Sprintf("%.0f", payouts.Data[i].End) + "\n"
+			payoutsStr += "- - Tx Hash: " + payouts.Data[i].TxHash + "\n\n"
 		}
 		msg = payoutsStr
 	case "/currentStats":
