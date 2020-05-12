@@ -10,4 +10,4 @@ RUN go mod download
 
 COPY . .
 
-ENTRYPOINT ["./wait-for.sh", "postgres:5432", "--", "go", "run", "main.go"]
+ENTRYPOINT ["go", "run", "main.go"]
