@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Alexsays/EithermineBot/coinbase"
 	"github.com/Alexsays/EithermineBot/database"
 	"github.com/Alexsays/EithermineBot/ethermine"
 	"github.com/Alexsays/EithermineBot/models"
@@ -28,6 +29,9 @@ var minerKeyboard = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardButtonData("🛑 Change Token", "/changeToken"),
 		tgbotapi.NewInlineKeyboardButtonData("📈 Current Stats", "/currentStats"),
 		// tgbotapi.NewInlineKeyboardButtonData("🗒 History", "/history"),
+	),
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("💰 ETH price", "/price"),
 	),
 	// tgbotapi.NewInlineKeyboardRow(
 	// 	tgbotapi.NewInlineKeyboardButtonData("🔄 Rounds", "/rounds"),
@@ -153,6 +157,11 @@ func createMessageForCommand(command string, db *gorm.DB, telegramUser *tgbotapi
 		waitingForToken = true
 		changeTokenStr := "🛑 Write now your Ethermine token or something else to skip this"
 		msg = changeTokenStr
+	case "/price":
+		price := coinbase.GetPrice()
+		priceStr := "💰 Price \n\n"
+		priceStr += "- Amount: " + price.Data.Amount + " €"
+		msg = priceStr
 	default:
 		msg = "🏗 Not available"
 	}
